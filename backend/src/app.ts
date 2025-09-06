@@ -48,3 +48,39 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, '../../frontend/build/index.html'));
   });
 }
+
+// ⭐ AGREGAR AL FINAL DEL ARCHIVO app.js
+
+// Configuración del puerto
+const PORT = process.env.PORT || 3000;
+
+// Iniciar el servidor
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}`);
+});
+
+// Manejo de errores del servidor
+server.on('error', (error) => {
+  console.error('❌ Server error:', error);
+});
+
+// Manejo de cierre graceful
+process.on('SIGTERM', async () => {
+  console.log('🛑 Received SIGTERM, shutting down gracefully');
+  await prisma.$disconnect();
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('🛑 Received SIGINT, shutting down gracefully');
+  await prisma.$disconnect();
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
