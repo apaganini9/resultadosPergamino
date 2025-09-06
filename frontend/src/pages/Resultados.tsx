@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { 
   RefreshCw, 
   Download, 
@@ -67,7 +67,7 @@ const Resultados: React.FC = () => {
   const [tipoVista, setTipoVista] = useState<'locales' | 'provinciales'>('locales');
   const [animateCards, setAnimateCards] = useState(false);
 
-  const colores = [
+  const colores = useMemo(() => [
     '#3b82f6', // Azul
     '#8b5cf6', // Púrpura  
     '#10b981', // Verde esmeralda
@@ -76,9 +76,9 @@ const Resultados: React.FC = () => {
     '#06b6d4', // Cyan
     '#f97316', // Naranja
     '#ec4899', // Rosa
-  ];
+  ], []);
 
-  const cargarResultados = async () => {
+  const cargarResultados = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -157,13 +157,13 @@ const Resultados: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [colores]);
 
   useEffect(() => {
     cargarResultados();
     const intervalo = setInterval(cargarResultados, 30000);
     return () => clearInterval(intervalo);
-  }, []);
+  }, [cargarResultados]);
 
   const resultadosActivos = tipoVista === 'locales' ? resultadosLocales : resultadosProvinciales;
   const tituloActivo = tipoVista === 'locales' ? 'Elecciones Locales' : 'Elecciones Provinciales';
@@ -430,7 +430,7 @@ const Resultados: React.FC = () => {
 
           {/* Panel central - Mapa */}
           <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20">
-                          <div className="text-center h-full flex flex-col justify-center">
+            <div className="text-center h-full flex flex-col justify-center">
               <div className="mb-6">
                 <MapPin className="h-16 w-16 text-blue-400 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-white mb-3">Mapa Electoral</h3>

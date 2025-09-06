@@ -46,77 +46,82 @@ async function main() {
 
   console.log('✅ Usuarios operadores creados');
 
-  // Crear listas locales (Concejales y Consejeros Escolares)
-  const listasLocales = [
-    'FUERZA PATRIA',
-    'POTENCIA', 
-    'FTE DE IZQ. Y DE TRABAJADORES - UNIDAD',
-    'LA LIBERTAD AVANZA',
-    'UNION LIBERAL',
-    'ESP. ABIERTO PARA EL DES. Y LA INT. SOCIAL',
-    'POLITICA OBRERA',
-    'PARTIDO LIBERTARIO',
-    'IDEAR PERGAMINO'
+  // LISTAS OFICIALES SEGÚN EL ACTA
+  const listasOficiales = [
+    // Número - Nombre - Habilitada Local - Habilitada Provincial
+    { numero: '2200', nombre: 'FUERZA PATRIA', local: true, provincial: true },
+    { numero: '2201', nombre: 'POTENCIA', local: true, provincial: true },
+    { numero: '2202', nombre: 'ES CON VOS ES CON NOSOTROS', local: false, provincial: true }, // NO USAR local
+    { numero: '2203', nombre: 'FTE DE IZQ. Y DE TRABAJADORES - UNIDAD', local: true, provincial: true },
+    { numero: '2206', nombre: 'LA LIBERTAD AVANZA', local: true, provincial: true },
+    { numero: '2207', nombre: 'UNION Y LIBERTAD', local: false, provincial: true }, // NO USAR local
+    { numero: '2208', nombre: 'UNION LIBERAL', local: true, provincial: true },
+    { numero: '91', nombre: 'ESP. ABIERTO PARA EL DES. Y LA INT. SOCIAL', local: true, provincial: true },
+    { numero: '959', nombre: 'MOVIMIENTO AVANZADA SOCIALISTA', local: false, provincial: true }, // NO USAR local
+    { numero: '963', nombre: 'FRENTE PATRIOTA FEDERAL', local: false, provincial: true }, // NO USAR local
+    { numero: '974', nombre: 'POLITICA OBRERA', local: true, provincial: true },
+    { numero: '980', nombre: 'PARTIDO TIEMPO DE TODOS', local: false, provincial: true }, // NO USAR local
+    { numero: '1003', nombre: 'CONSTRUYENDO PORVENIR', local: false, provincial: true }, // NO USAR local
+    { numero: '1006', nombre: 'PARTIDO LIBERTARIO', local: true, provincial: true },
+    { numero: '1008', nombre: 'VALORES REPUBLICANOS', local: false, provincial: true }, // NO USAR local
+    { numero: '615', nombre: 'IDEAR PERGAMINO', local: true, provincial: false } // NO USAR provincial
   ];
 
-  for (let i = 0; i < listasLocales.length; i++) {
-    await prisma.lista.upsert({
-      where: { 
-        nombre_tipo: {
-          nombre: listasLocales[i],
-          tipo: 'LOCAL'
+  // Crear listas provinciales
+  for (let i = 0; i < listasOficiales.length; i++) {
+    const lista = listasOficiales[i];
+    
+    if (lista.provincial) {
+      await prisma.lista.upsert({
+        where: { 
+          numero_tipo: {
+            numero: lista.numero,
+            tipo: 'PROVINCIAL'
+          }
+        },
+        update: {},
+        create: {
+          numero: lista.numero,
+          nombre: lista.nombre,
+          tipo: 'PROVINCIAL',
+          orden: i + 1,
+          activa: true,
+          habilitadaLocal: lista.local,
+          habilitadaProvincial: lista.provincial
         }
-      },
-      update: {},
-      create: {
-        nombre: listasLocales[i],
-        tipo: 'LOCAL',
-        orden: i + 1,
-        activa: true
-      }
-    });
-  }
-
-  console.log('✅ Listas locales creadas');
-
-  // Crear listas provinciales (Diputados)
-  const listasProvinciales = [
-    'FUERZA PATRIA',
-    'POTENCIA',
-    'ES CON VOS ES CON NOSOTROS', 
-    'FTE DE IZQ. Y DE TRABAJADORES - UNIDAD',
-    'LA LIBERTAD AVANZA',
-    'UNION Y LIBERTAD',
-    'UNION LIBERAL',
-    'ESP. ABIERTO PARA EL DES. Y LA INT. SOCIAL',
-    'MOVIMIENTO AVANZADA SOCIALISTA',
-    'FRENTE PATRIOTA FEDERAL',
-    'POLITICA OBRERA',
-    'PARTIDO TIEMPO DE TODOS',
-    'CONSTRUYENDO PORVENIR',
-    'PARTIDO LIBERTARIO',
-    'VALORES REPUBLICANOS'
-  ];
-
-  for (let i = 0; i < listasProvinciales.length; i++) {
-    await prisma.lista.upsert({
-      where: { 
-        nombre_tipo: {
-          nombre: listasProvinciales[i],
-          tipo: 'PROVINCIAL'
-        }
-      },
-      update: {},
-      create: {
-        nombre: listasProvinciales[i],
-        tipo: 'PROVINCIAL',
-        orden: i + 1,
-        activa: true
-      }
-    });
+      });
+    }
   }
 
   console.log('✅ Listas provinciales creadas');
+
+  // Crear listas locales (solo las habilitadas)
+  for (let i = 0; i < listasOficiales.length; i++) {
+    const lista = listasOficiales[i];
+    
+    if (lista.local) {
+      await prisma.lista.upsert({
+        where: { 
+          numero_tipo: {
+            numero: lista.numero,
+            tipo: 'LOCAL'
+          }
+        },
+        update: {},
+        create: {
+          numero: lista.numero,
+          nombre: lista.nombre,
+          tipo: 'LOCAL',
+          orden: i + 1,
+          activa: true,
+          habilitadaLocal: lista.local,
+          habilitadaProvincial: lista.provincial
+        }
+      });
+    }
+  }
+
+  console.log('✅ Listas locales creadas');
 
   // Crear las 280 mesas de Pergamino
   console.log('📊 Creando 280 mesas...');
@@ -152,9 +157,10 @@ async function main() {
   // Configuración del sistema
   const configuraciones = [
     { clave: 'NOMBRE_ELECCION', valor: 'Elecciones Provinciales 2025' },
-    { clave: 'FECHA_ELECCION', valor: '2025-10-27' },
+    { clave: 'FECHA_ELECCION', valor: '2025-09-07' },
     { clave: 'MUNICIPIO', valor: 'Pergamino' },
     { clave: 'PROVINCIA', valor: 'Buenos Aires' },
+    { clave: 'DISTRITO_ELECTORAL', valor: '087 - PERGAMINO' },
     { clave: 'TOTAL_ELECTORES_ESTIMADOS', valor: '93000' },
     { clave: 'VERSION_SISTEMA', valor: '1.0.0' }
   ];
@@ -173,13 +179,13 @@ async function main() {
   if (process.env.NODE_ENV === 'development') {
     console.log('🧪 Creando datos de prueba...');
     
-    // Cargar algunas mesas de ejemplo
+    // Cargar algunas mesas de ejemplo con datos realistas
     const mesasPrueba = [1, 2, 3];
     const listasLocalesCreadas = await prisma.lista.findMany({ 
-      where: { tipo: 'LOCAL' } 
+      where: { tipo: 'LOCAL', activa: true } 
     });
     const listasProvincialesCreadas = await prisma.lista.findMany({ 
-      where: { tipo: 'PROVINCIAL' } 
+      where: { tipo: 'PROVINCIAL', activa: true } 
     });
 
     for (const numeroMesa of mesasPrueba) {
@@ -188,22 +194,32 @@ async function main() {
       });
 
       if (mesa) {
-        // Crear acta
-        const sobresRecibidos = Math.floor(Math.random() * 200) + 150;
+        // Simular datos realistas del acta
+        const electoresVotaron = Math.floor(Math.random() * 50) + 200; // 200-250
+        const sobresRecibidos = electoresVotaron - Math.floor(Math.random() * 5); // 0-4 sobres menos
+        const diferencia = electoresVotaron - sobresRecibidos;
         
         const acta = await prisma.actaMesa.upsert({
           where: { mesaId: mesa.id },
           update: {
-            sobresRecibidos: sobresRecibidos,
-            electoresVotaron: sobresRecibidos - 10,
-            observaciones: 'Mesa de prueba - datos ficticios (actualizado)',
+            electoresVotaron,
+            sobresRecibidos,
+            diferencia,
+            votosEnBlanco: Math.floor(Math.random() * 5) + 1,
+            votosImpugnados: Math.floor(Math.random() * 3),
+            votosSobreNro3: Math.floor(Math.random() * 2),
+            observaciones: 'Mesa de prueba con datos ficticios realistas',
             usuarioId: adminUser.id
           },
           create: {
             mesaId: mesa.id,
-            sobresRecibidos: sobresRecibidos,
-            electoresVotaron: sobresRecibidos - 10,
-            observaciones: 'Mesa de prueba - datos ficticios',
+            electoresVotaron,
+            sobresRecibidos,
+            diferencia,
+            votosEnBlanco: Math.floor(Math.random() * 5) + 1,
+            votosImpugnados: Math.floor(Math.random() * 3),
+            votosSobreNro3: Math.floor(Math.random() * 2),
+            observaciones: 'Mesa de prueba con datos ficticios realistas',
             usuarioId: adminUser.id
           }
         });
@@ -213,28 +229,58 @@ async function main() {
           where: { mesaId: mesa.id }
         });
 
-        // Crear votos aleatorios para listas locales
-        for (const lista of listasLocalesCreadas) {
-          const votos = Math.floor(Math.random() * 30) + 5; // Entre 5-35 votos
-          await prisma.votoLista.create({
-            data: {
-              mesaId: mesa.id,
-              listaId: lista.id,
-              cantidad: votos
-            }
-          });
+        // Crear votos realistas que sumen exactamente sobresRecibidos
+        let votosRestantesLocal = sobresRecibidos;
+        let votosRestanteProv = sobresRecibidos;
+
+        // Votos locales
+        for (let i = 0; i < listasLocalesCreadas.length; i++) {
+          const lista = listasLocalesCreadas[i];
+          let votos;
+          
+          if (i === listasLocalesCreadas.length - 1) {
+            // Última lista: asignar votos restantes
+            votos = votosRestantesLocal;
+          } else {
+            // Distribución realista: más votos a primeras listas
+            const maxVotos = Math.min(Math.floor(sobresRecibidos * 0.4), votosRestantesLocal);
+            votos = Math.floor(Math.random() * maxVotos) + 5;
+            votosRestantesLocal -= votos;
+          }
+
+          if (votos > 0) {
+            await prisma.votoLista.create({
+              data: {
+                mesaId: mesa.id,
+                listaId: lista.id,
+                cantidad: votos
+              }
+            });
+          }
         }
 
-        // Crear votos aleatorios para listas provinciales
-        for (const lista of listasProvincialesCreadas) {
-          const votos = Math.floor(Math.random() * 30) + 5; // Entre 5-35 votos
-          await prisma.votoLista.create({
-            data: {
-              mesaId: mesa.id,
-              listaId: lista.id,
-              cantidad: votos
-            }
-          });
+        // Votos provinciales (similar distribución)
+        for (let i = 0; i < listasProvincialesCreadas.length; i++) {
+          const lista = listasProvincialesCreadas[i];
+          let votos;
+          
+          if (i === listasProvincialesCreadas.length - 1) {
+            votos = votosRestanteProv;
+          } else {
+            const maxVotos = Math.min(Math.floor(sobresRecibidos * 0.3), votosRestanteProv);
+            votos = Math.floor(Math.random() * maxVotos) + 3;
+            votosRestanteProv -= votos;
+          }
+
+          if (votos > 0) {
+            await prisma.votoLista.create({
+              data: {
+                mesaId: mesa.id,
+                listaId: lista.id,
+                cantidad: votos
+              }
+            });
+          }
         }
 
         // Actualizar estado de la mesa
@@ -247,7 +293,7 @@ async function main() {
           }
         });
 
-        console.log(`   Mesa ${numeroMesa} cargada con datos ficticios`);
+        console.log(`   Mesa ${numeroMesa} cargada con datos realistas (${sobresRecibidos} sobres)`);
       }
     }
 
@@ -260,6 +306,10 @@ async function main() {
   console.log('👤 Operador1: operador1@pergamino.gov.ar / operador123');
   console.log('👤 Operador2: operador2@pergamino.gov.ar / operador123');
   console.log('👤 Operador3: operador3@pergamino.gov.ar / operador123');
+  console.log('\n📊 Listas configuradas según acta oficial:');
+  console.log('- 16 listas provinciales (15 habilitadas + 1 NO USAR)');
+  console.log('- 9 listas locales habilitadas');
+  console.log('- Numeración oficial: 2200-2208, 91, 615, 959, 963, 974, 980, 1003, 1006, 1008');
 }
 
 main()

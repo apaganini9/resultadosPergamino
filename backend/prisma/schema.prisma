@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -29,15 +26,18 @@ model Usuario {
 }
 
 model Lista {
-  id     Int       @id @default(autoincrement())
-  nombre String
-  tipo   TipoLista
-  orden  Int
-  activa Boolean   @default(true)
+  id       Int       @id @default(autoincrement())
+  numero   String    // Número oficial de la lista (ej: "2200", "91", "615")
+  nombre   String
+  tipo     TipoLista
+  orden    Int
+  activa   Boolean   @default(true)
+  habilitadaLocal      Boolean @default(true)  // Para manejar "NO USAR" en locales
+  habilitadaProvincial Boolean @default(true)  // Para manejar "NO USAR" en provinciales
   
   votos VotoLista[]
   
-  @@unique([nombre, tipo], name: "nombre_tipo")  //
+  @@unique([numero, tipo], name: "numero_tipo")
   @@map("listas")
 }
 
@@ -58,11 +58,12 @@ model Mesa {
 model ActaMesa {
   id                    Int      @id @default(autoincrement())
   mesaId                Int      @unique
-  sobresRecibidos       Int
-  electoresVotaron      Int      // Campo A del acta
-  votosEnBlanco         Int      @default(0)
-  votosImpugnados       Int      @default(0)
-  votosSobreNro3        Int      @default(0)
+  electoresVotaron      Int      // Campo A del acta oficial
+  sobresRecibidos       Int      // Campo B del acta oficial
+  diferencia            Int      // Campo C del acta oficial (A-B)
+  votosEnBlanco         Int      @default(0)    // Campo D
+  votosImpugnados       Int      @default(0)    // Votos de identidad impugnada
+  votosSobreNro3        Int      @default(0)    // Campo E
   observaciones         String?
   fechaCarga            DateTime @default(now())
   usuarioId             Int

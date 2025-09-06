@@ -4,12 +4,16 @@ import { z } from 'zod';
 
 const prisma = new PrismaClient();
 
-// Esquemas de validación
+// Esquemas de validación actualizados según el acta oficial
 const cargarActaSchema = z.object({
   mesaNumero: z.number().int().positive(),
+  electoresVotaron: z.number().int().min(0),
   sobresRecibidos: z.number().int().min(0),
   votosLocales: z.record(z.string(), z.number().int().min(0)),
   votosProvinciales: z.record(z.string(), z.number().int().min(0)),
+  votosEnBlanco: z.number().int().min(0).default(0),
+  votosImpugnados: z.number().int().min(0).default(0),
+  votosSobreNro3: z.number().int().min(0).default(0),
   observaciones: z.string().optional()
 });
 
@@ -64,7 +68,7 @@ export class MesaController {
     }
   }
 
-  // Obtener mesa por número
+  // Obtener mesa por número con formato del acta oficial
   static async obtenerMesaPorNumero(req: Request, res: Response) {
     try {
       const { numero } = req.params;
@@ -98,29 +102,53 @@ export class MesaController {
         });
       }
 
-      // Separar votos por tipo
-      const votosLocales = mesa.votos.filter(v => v.lista.tipo === 'LOCAL');
-      const votosProvinciales = mesa.votos.filter(v => v.lista.tipo === 'PROVINCIAL');
+      // Separar votos por tipo y ordenar por número oficial
+      const votosLocales = mesa.votos
+        .filter(v => v.lista.tipo === 'LOCAL')
+        .sort((a, b) => parseInt(a.lista.numero) - parseInt(b.lista.numero));
+        
+      const votosProvinciales = mesa.votos
+        .filter(v => v.lista.tipo === 'PROVINCIAL')
+        .sort((a, b) => parseInt(a.lista.numero) - parseInt(b.lista.numero));
+
+      const totalVotosLocales = votosLocales.reduce((sum, v) => sum + v.cantidad, 0);
+      const totalVotosProvinciales = votosProvinciales.reduce((sum, v) => sum + v.cantidad, 0);
 
       res.json({
         success: true,
         data: {
-          mesa: {
-            id: mesa.id,
-            numero: mesa.numero,
-            ubicacion: mesa.ubicacion,
-            estado: mesa.estado,
-            fechaCarga: mesa.fechaCarga
-          },
-          acta: mesa.acta,
-          votos: {
-            locales: votosLocales,
-            provinciales: votosProvinciales
-          },
+          id: mesa.id,
+          numero: mesa.numero,
+          ubicacion: mesa.ubicacion,
+          estado: mesa.estado,
+          fechaCarga: mesa.fechaCarga,
+          acta: mesa.acta ? {
+            ...mesa.acta,
+            diferencia: mesa.acta.electoresVotaron - mesa.acta.sobresRecibidos
+          } : null,
+          votos: votosLocales.concat(votosProvinciales).map(v => ({
+            id: v.id,
+            cantidad: v.cantidad,
+            lista: {
+              id: v.lista.id,
+              numero: v.lista.numero,
+              nombre: v.lista.nombre,
+              tipo: v.lista.tipo
+            }
+          })),
           totales: {
-            votosLocales: votosLocales.reduce((sum, v) => sum + v.cantidad, 0),
-            votosProvinciales: votosProvinciales.reduce((sum, v) => sum + v.cantidad, 0),
-            sobresRecibidos: mesa.acta?.sobresRecibidos || 0
+            electoresVotaron: mesa.acta?.electoresVotaron || 0,
+            sobresRecibidos: mesa.acta?.sobresRecibidos || 0,
+            diferencia: mesa.acta ? mesa.acta.electoresVotaron - mesa.acta.sobresRecibidos : 0,
+            votosLocales: totalVotosLocales,
+            votosProvinciales: totalVotosProvinciales,
+            votosEnBlanco: mesa.acta?.votosEnBlanco || 0,
+            votosImpugnados: mesa.acta?.votosImpugnados || 0,
+            votosSobreNro3: mesa.acta?.votosSobreNro3 || 0,
+            totalGeneral: totalVotosLocales + totalVotosProvinciales + 
+                         (mesa.acta?.votosEnBlanco || 0) + 
+                         (mesa.acta?.votosImpugnados || 0) + 
+                         (mesa.acta?.votosSobreNro3 || 0)
           }
         }
       });
@@ -133,7 +161,61 @@ export class MesaController {
     }
   }
 
-  // Cargar acta de mesa
+  // Obtener listas disponibles según el acta oficial
+  static async obtenerListas(req: Request, res: Response) {
+    try {
+      const { tipo } = req.query;
+
+      const filtro: any = { activa: true };
+      if (tipo) filtro.tipo = tipo;
+
+      const listas = await prisma.lista.findMany({
+        where: filtro,
+        orderBy: [
+          { tipo: 'asc' },
+          { orden: 'asc' }
+        ]
+      });
+
+      // Separar por tipo y filtrar según habilitación
+      const listasProvinciales = listas
+        .filter(l => l.tipo === 'PROVINCIAL' && l.habilitadaProvincial)
+        .map(l => ({
+          id: l.id,
+          numero: l.numero,
+          nombre: l.nombre,
+          tipo: l.tipo,
+          orden: l.orden
+        }));
+
+      const listasLocales = listas
+        .filter(l => l.tipo === 'LOCAL' && l.habilitadaLocal)
+        .map(l => ({
+          id: l.id,
+          numero: l.numero,
+          nombre: l.nombre,
+          tipo: l.tipo,
+          orden: l.orden
+        }));
+
+      res.json({
+        success: true,
+        data: {
+          provinciales: listasProvinciales,
+          locales: listasLocales,
+          total: listasProvinciales.length + listasLocales.length
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error al obtener listas:', error);
+      res.status(500).json({ 
+        success: false,
+        error: 'Error interno del servidor' 
+      });
+    }
+  }
+
+  // Cargar acta con validaciones del acta oficial
   static async cargarActa(req: Request, res: Response) {
     try {
       const validatedData = cargarActaSchema.parse(req.body);
@@ -158,15 +240,36 @@ export class MesaController {
         });
       }
 
-      // Obtener todas las listas
+      // Obtener listas habilitadas
       const [listasLocales, listasProvinciales] = await Promise.all([
-        prisma.lista.findMany({ where: { tipo: 'LOCAL', activa: true } }),
-        prisma.lista.findMany({ where: { tipo: 'PROVINCIAL', activa: true } })
+        prisma.lista.findMany({ 
+          where: { tipo: 'LOCAL', activa: true, habilitadaLocal: true } 
+        }),
+        prisma.lista.findMany({ 
+          where: { tipo: 'PROVINCIAL', activa: true, habilitadaProvincial: true } 
+        })
       ]);
 
-      // Validar votos locales
+      // Validaciones según el acta oficial
       const totalVotosLocales = Object.values(validatedData.votosLocales).reduce((sum, votos) => sum + votos, 0);
       const totalVotosProvinciales = Object.values(validatedData.votosProvinciales).reduce((sum, votos) => sum + votos, 0);
+      const diferencia = validatedData.electoresVotaron - validatedData.sobresRecibidos;
+
+      // Validación 1: Electores votaron >= Sobres recibidos
+      if (validatedData.sobresRecibidos > validatedData.electoresVotaron) {
+        return res.status(400).json({ 
+          success: false,
+          error: `Los sobres recibidos (${validatedData.sobresRecibidos}) no pueden superar a los electores que votaron (${validatedData.electoresVotaron})` 
+        });
+      }
+
+      // Validación 2: Votos de cada categoría <= Sobres recibidos
+      if (totalVotosProvinciales > validatedData.sobresRecibidos) {
+        return res.status(400).json({ 
+          success: false,
+          error: `Los votos provinciales (${totalVotosProvinciales}) no pueden superar los sobres recibidos (${validatedData.sobresRecibidos})` 
+        });
+      }
 
       if (totalVotosLocales > validatedData.sobresRecibidos) {
         return res.status(400).json({ 
@@ -175,27 +278,51 @@ export class MesaController {
         });
       }
 
-      if (totalVotosProvinciales > validatedData.sobresRecibidos) {
-        return res.status(400).json({ 
-          success: false,
-          error: `Los votos provinciales (${totalVotosProvinciales}) no pueden superar los sobres recibidos (${validatedData.sobresRecibidos})` 
-        });
+      // Validación 3: Verificar que las listas existen y están habilitadas
+      for (const nombreLista of Object.keys(validatedData.votosLocales)) {
+        const lista = listasLocales.find(l => l.nombre === nombreLista);
+        if (!lista) {
+          return res.status(400).json({ 
+            success: false,
+            error: `Lista local "${nombreLista}" no encontrada o no habilitada` 
+          });
+        }
+      }
+
+      for (const nombreLista of Object.keys(validatedData.votosProvinciales)) {
+        const lista = listasProvinciales.find(l => l.nombre === nombreLista);
+        if (!lista) {
+          return res.status(400).json({ 
+            success: false,
+            error: `Lista provincial "${nombreLista}" no encontrada o no habilitada` 
+          });
+        }
       }
 
       // Transacción para cargar acta y votos
       const resultado = await prisma.$transaction(async (prisma) => {
-        // Crear o actualizar acta
+        // Crear o actualizar acta con campos del acta oficial
         const acta = await prisma.actaMesa.upsert({
           where: { mesaId: mesa.id },
           update: {
+            electoresVotaron: validatedData.electoresVotaron,
             sobresRecibidos: validatedData.sobresRecibidos,
+            diferencia: diferencia,
+            votosEnBlanco: validatedData.votosEnBlanco,
+            votosImpugnados: validatedData.votosImpugnados,
+            votosSobreNro3: validatedData.votosSobreNro3,
             observaciones: validatedData.observaciones,
             fechaCarga: new Date(),
             usuarioId: userId
           },
           create: {
             mesaId: mesa.id,
+            electoresVotaron: validatedData.electoresVotaron,
             sobresRecibidos: validatedData.sobresRecibidos,
+            diferencia: diferencia,
+            votosEnBlanco: validatedData.votosEnBlanco,
+            votosImpugnados: validatedData.votosImpugnados,
+            votosSobreNro3: validatedData.votosSobreNro3,
             observaciones: validatedData.observaciones,
             usuarioId: userId
           }
@@ -253,19 +380,26 @@ export class MesaController {
         return acta;
       });
 
-      console.log(`📝 Acta cargada: Mesa ${validatedData.mesaNumero} por ${req.user?.email}`);
+      console.log(`📋 Acta cargada: Mesa ${validatedData.mesaNumero} por ${req.user?.email}`);
 
       res.status(201).json({ 
         success: true,
         message: `Acta de Mesa ${validatedData.mesaNumero} cargada exitosamente`,
-        data: resultado
+        data: {
+          ...resultado,
+          diferencia: diferencia,
+          totales: {
+            votosProvinciales: totalVotosProvinciales,
+            votosLocales: totalVotosLocales
+          }
+        }
       });
 
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 
           success: false,
-          error: 'Datos inválidos',
+          error: 'Datos inválidos según el formato del acta',
           details: error.errors
         });
       }
@@ -278,7 +412,7 @@ export class MesaController {
     }
   }
 
-  // Obtener estadísticas de mesas
+  // Obtener estadísticas actualizadas
   static async obtenerEstadisticas(req: Request, res: Response) {
     try {
       const [estadisticas, configuracion] = await Promise.all([
@@ -286,19 +420,28 @@ export class MesaController {
           prisma.mesa.count(),
           prisma.mesa.count({ where: { estado: 'CARGADA' } }),
           prisma.mesa.count({ where: { estado: 'PENDIENTE' } }),
-          prisma.votoLista.aggregate({ _sum: { cantidad: true } })
+          prisma.votoLista.aggregate({ _sum: { cantidad: true } }),
+          prisma.actaMesa.aggregate({ 
+            _sum: { 
+              electoresVotaron: true,
+              sobresRecibidos: true,
+              votosEnBlanco: true,
+              votosImpugnados: true,
+              votosSobreNro3: true
+            } 
+          })
         ]),
         prisma.configuracionSistema.findUnique({ 
           where: { clave: 'TOTAL_ELECTORES_ESTIMADOS' } 
         })
       ]);
 
-      const [totalMesas, mesasCargadas, mesasPendientes, totalVotos] = estadisticas;
+      const [totalMesas, mesasCargadas, mesasPendientes, totalVotos, totalesActas] = estadisticas;
       
       const progreso = totalMesas > 0 ? (mesasCargadas / totalMesas) * 100 : 0;
       const electoresEstimados = parseInt(configuracion?.valor || '93000');
       const participacionEstimada = electoresEstimados > 0 ? 
-        ((totalVotos._sum.cantidad || 0) / electoresEstimados) * 100 : 0;
+        ((totalesActas._sum.electoresVotaron || 0) / electoresEstimados) * 100 : 0;
 
       res.json({
         success: true,
@@ -307,7 +450,12 @@ export class MesaController {
           mesasCargadas,
           mesasPendientes,
           progreso: Math.round(progreso * 100) / 100,
+          electoresVotaron: totalesActas._sum.electoresVotaron || 0,
+          sobresRecibidos: totalesActas._sum.sobresRecibidos || 0,
           votosTotales: totalVotos._sum.cantidad || 0,
+          votosEnBlanco: totalesActas._sum.votosEnBlanco || 0,
+          votosImpugnados: totalesActas._sum.votosImpugnados || 0,
+          votosSobreNro3: totalesActas._sum.votosSobreNro3 || 0,
           electoresEstimados,
           participacionEstimada: Math.round(participacionEstimada * 100) / 100,
           ultimaActualizacion: new Date().toISOString()
@@ -349,7 +497,7 @@ export class MesaController {
     }
   }
 
-  // Validar integridad de una mesa
+  // Validar integridad de mesa según acta oficial
   static async validarMesa(req: Request, res: Response) {
     try {
       const { numero } = req.params;
@@ -374,7 +522,7 @@ export class MesaController {
       const errores = [];
       const warnings = [];
 
-      // Validaciones
+      // Validaciones según acta oficial
       const totalVotosLocales = mesa.votos
         .filter(v => v.lista.tipo === 'LOCAL')
         .reduce((sum, v) => sum + v.cantidad, 0);
@@ -383,29 +531,44 @@ export class MesaController {
         .filter(v => v.lista.tipo === 'PROVINCIAL')
         .reduce((sum, v) => sum + v.cantidad, 0);
 
-      const sobresRecibidos = mesa.acta?.sobresRecibidos || 0;
+      const acta = mesa.acta!;
+      const diferencia = acta.electoresVotaron - acta.sobresRecibidos;
 
-      if (totalVotosLocales > sobresRecibidos) {
-        errores.push(`Votos locales (${totalVotosLocales}) superan sobres recibidos (${sobresRecibidos})`);
+      // Validaciones críticas
+      if (acta.sobresRecibidos > acta.electoresVotaron) {
+        errores.push(`Sobres (${acta.sobresRecibidos}) > Electores que votaron (${acta.electoresVotaron})`);
       }
 
-      if (totalVotosProvinciales > sobresRecibidos) {
-        errores.push(`Votos provinciales (${totalVotosProvinciales}) superan sobres recibidos (${sobresRecibidos})`);
+      if (totalVotosLocales > acta.sobresRecibidos) {
+        errores.push(`Votos locales (${totalVotosLocales}) > Sobres recibidos (${acta.sobresRecibidos})`);
       }
 
+      if (totalVotosProvinciales > acta.sobresRecibidos) {
+        errores.push(`Votos provinciales (${totalVotosProvinciales}) > Sobres recibidos (${acta.sobresRecibidos})`);
+      }
+
+      if (acta.diferencia !== diferencia) {
+        errores.push(`Diferencia calculada (${diferencia}) ≠ Diferencia guardada (${acta.diferencia})`);
+      }
+
+      // Warnings
       if (totalVotosLocales === 0) {
-        warnings.push('No hay votos registrados para listas locales');
+        warnings.push('Sin votos registrados para listas locales');
       }
 
       if (totalVotosProvinciales === 0) {
-        warnings.push('No hay votos registrados para listas provinciales');
+        warnings.push('Sin votos registrados para listas provinciales');
       }
 
-      const participacion = sobresRecibidos > 0 ? 
-        Math.max(totalVotosLocales, totalVotosProvinciales) / sobresRecibidos : 0;
+      const participacionLocal = acta.sobresRecibidos > 0 ? (totalVotosLocales / acta.sobresRecibidos) * 100 : 0;
+      const participacionProvincial = acta.sobresRecibidos > 0 ? (totalVotosProvinciales / acta.sobresRecibidos) * 100 : 0;
 
-      if (participacion < 0.5) {
-        warnings.push(`Baja participación: ${(participacion * 100).toFixed(1)}%`);
+      if (participacionLocal < 70) {
+        warnings.push(`Baja participación local: ${participacionLocal.toFixed(1)}%`);
+      }
+
+      if (participacionProvincial < 70) {
+        warnings.push(`Baja participación provincial: ${participacionProvincial.toFixed(1)}%`);
       }
 
       res.json({
@@ -416,11 +579,16 @@ export class MesaController {
           errores,
           warnings,
           estadisticas: {
-            sobresRecibidos,
+            electoresVotaron: acta.electoresVotaron,
+            sobresRecibidos: acta.sobresRecibidos,
+            diferencia: acta.diferencia,
             totalVotosLocales,
             totalVotosProvinciales,
-            participacionLocal: totalVotosLocales / sobresRecibidos * 100,
-            participacionProvincial: totalVotosProvinciales / sobresRecibidos * 100
+            votosEnBlanco: acta.votosEnBlanco,
+            votosImpugnados: acta.votosImpugnados,
+            votosSobreNro3: acta.votosSobreNro3,
+            participacionLocal: participacionLocal,
+            participacionProvincial: participacionProvincial
           }
         }
       });

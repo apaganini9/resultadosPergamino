@@ -195,6 +195,9 @@ app.get('/api/mesas/:numero', async (req, res) => {
 });
 
 // Ruta para cargar acta electoral
+// Reemplaza la sección del endpoint POST /api/mesas/cargar-acta en tu app.ts
+// Desde la línea 170 aproximadamente hasta la línea 320
+
 app.post('/api/mesas/cargar-acta', authMiddleware, requireRole('ADMIN', 'OPERADOR'), async (req, res) => {
   try {
     const {
@@ -209,7 +212,7 @@ app.post('/api/mesas/cargar-acta', authMiddleware, requireRole('ADMIN', 'OPERADO
       observaciones
     } = req.body;
 
-    const userId = req.user?.id; // Usar el ID del usuario autenticado
+    const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({
@@ -238,7 +241,10 @@ app.post('/api/mesas/cargar-acta', authMiddleware, requireRole('ADMIN', 'OPERADO
       });
     }
 
-    // Validaciones básicas
+    // Calcular diferencia correctamente
+    const diferencia = electoresVotaron - sobresRecibidos;
+
+    // Validaciones básicas según acta oficial
     if (sobresRecibidos > electoresVotaron) {
       return res.status(400).json({
         success: false,
@@ -271,21 +277,24 @@ app.post('/api/mesas/cargar-acta', authMiddleware, requireRole('ADMIN', 'OPERADO
         update: {
           electoresVotaron,
           sobresRecibidos,
+          diferencia, // Usar la diferencia calculada
           votosEnBlanco: votosEnBlanco || 0,
           votosImpugnados: votosImpugnados || 0,
           votosSobreNro3: votosSobreNro3 || 0,
           observaciones: observaciones || '',
-          fechaCarga: new Date()
+          fechaCarga: new Date(),
+          usuarioId: userId
         },
         create: {
           mesaId: mesa.id,
           electoresVotaron,
           sobresRecibidos,
+          diferencia, // Usar la diferencia calculada
           votosEnBlanco: votosEnBlanco || 0,
           votosImpugnados: votosImpugnados || 0,
           votosSobreNro3: votosSobreNro3 || 0,
           observaciones: observaciones || '',
-          usuarioId: userId // Por ahora usar ID fijo, después conectar con auth
+          usuarioId: userId
         }
       });
 
@@ -301,39 +310,39 @@ app.post('/api/mesas/cargar-acta', authMiddleware, requireRole('ADMIN', 'OPERADO
       ]);
 
       // Preparar votos
-const votosData: VotoData[] = [];
+      const votosData: VotoData[] = [];
 
-// Votos locales
-if (votosLocales) {
-  Object.entries(votosLocales).forEach(([nombreLista, cantidad]) => {
-    const lista = listasLocalesDB.find(l => l.nombre === nombreLista);
-    const cantidadNum = Number(cantidad);
-    
-    if (lista && !isNaN(cantidadNum) && cantidadNum > 0) {
-      votosData.push({
-        mesaId: mesa.id,
-        listaId: lista.id,
-        cantidad: cantidadNum
-      });
-    }
-  });
-}
+      // Votos locales
+      if (votosLocales) {
+        Object.entries(votosLocales).forEach(([nombreLista, cantidad]) => {
+          const lista = listasLocalesDB.find(l => l.nombre === nombreLista);
+          const cantidadNum = Number(cantidad);
+          
+          if (lista && !isNaN(cantidadNum) && cantidadNum > 0) {
+            votosData.push({
+              mesaId: mesa.id,
+              listaId: lista.id,
+              cantidad: cantidadNum
+            });
+          }
+        });
+      }
 
-// Votos provinciales
-if (votosProvinciales) {
-  Object.entries(votosProvinciales).forEach(([nombreLista, cantidad]) => {
-    const lista = listasProvincialesDB.find(l => l.nombre === nombreLista);
-    const cantidadNum = Number(cantidad);
-    
-    if (lista && !isNaN(cantidadNum) && cantidadNum > 0) {
-      votosData.push({
-        mesaId: mesa.id,
-        listaId: lista.id,
-        cantidad: cantidadNum
-      });
-    }
-  });
-}
+      // Votos provinciales
+      if (votosProvinciales) {
+        Object.entries(votosProvinciales).forEach(([nombreLista, cantidad]) => {
+          const lista = listasProvincialesDB.find(l => l.nombre === nombreLista);
+          const cantidadNum = Number(cantidad);
+          
+          if (lista && !isNaN(cantidadNum) && cantidadNum > 0) {
+            votosData.push({
+              mesaId: mesa.id,
+              listaId: lista.id,
+              cantidad: cantidadNum
+            });
+          }
+        });
+      }
 
       // Crear votos
       if (votosData.length > 0) {
@@ -345,14 +354,15 @@ if (votosProvinciales) {
         where: { id: mesa.id },
         data: {
           estado: 'CARGADA',
-          fechaCarga: new Date()
+          fechaCarga: new Date(),
+          usuarioCarga: userId
         }
       });
 
       return acta;
     });
 
-    console.log(`Acta cargada: Mesa ${mesaNumero} - Votos: ${totalVotosProvinciales + totalVotosLocales}`);
+    console.log(`Acta cargada: Mesa ${mesaNumero} - Electores: ${electoresVotaron}, Sobres: ${sobresRecibidos}, Diferencia: ${diferencia}`);
 
     res.json({
       success: true,

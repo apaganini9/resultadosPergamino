@@ -15,44 +15,36 @@ interface ActaData {
   observaciones: string;
 }
 
+interface ListaOficial {
+  numero: string;
+  nombre: string;
+  habilitadaLocal: boolean;
+  habilitadaProvincial: boolean;
+}
+
 interface MensajeEstado {
   tipo: 'success' | 'error' | 'warning';
   texto: string;
 }
 
-interface ValidationResult {
-  errores: string[];
-  warnings: string[];
-}
-
-// Listas constantes fuera del componente para evitar bucles infinitos
-const LISTAS_PROVINCIALES_REALES: string[] = [
-  'FUERZA PATRIA',
-  'POTENCIA',
-  'ES CON VOS ES CON NOSOTROS',
-  'FTE DE IZQ. Y DE TRABAJADORES - UNIDAD',
-  'LA LIBERTAD AVANZA',
-  'UNION Y LIBERTAD',
-  'UNION LIBERAL',
-  'ESP. ABIERTO PARA EL DES. Y LA INT. SOCIAL',
-  'MOVIMIENTO AVANZADA SOCIALISTA',
-  'FRENTE PATRIOTA FEDERAL',
-  'POLITICA OBRERA',
-  'PARTIDO TIEMPO DE TODOS',
-  'CONSTRUYENDO PORVENIR',
-  'PARTIDO LIBERTARIO',
-  'VALORES REPUBLICANOS'
-];
-
-const LISTAS_LOCALES_REALES: string[] = [
-  'FUERZA PATRIA',
-  'POTENCIA',
-  'FTE DE IZQ. Y DE TRABAJADORES - UNIDAD',
-  'LA LIBERTAD AVANZA',
-  'UNION LIBERAL',
-  'ESP. ABIERTO PARA EL DES. Y LA INT. SOCIAL',
-  'POLITICA OBRERA',
-  'PARTIDO LIBERTARIO'
+// Listas oficiales según el acta real
+const LISTAS_OFICIALES: ListaOficial[] = [
+  { numero: '2200', nombre: 'FUERZA PATRIA', habilitadaLocal: true, habilitadaProvincial: true },
+  { numero: '2201', nombre: 'POTENCIA', habilitadaLocal: true, habilitadaProvincial: true },
+  { numero: '2202', nombre: 'ES CON VOS ES CON NOSOTROS', habilitadaLocal: false, habilitadaProvincial: true },
+  { numero: '2203', nombre: 'FTE DE IZQ. Y DE TRABAJADORES - UNIDAD', habilitadaLocal: true, habilitadaProvincial: true },
+  { numero: '2206', nombre: 'LA LIBERTAD AVANZA', habilitadaLocal: true, habilitadaProvincial: true },
+  { numero: '2207', nombre: 'UNION Y LIBERTAD', habilitadaLocal: false, habilitadaProvincial: true },
+  { numero: '2208', nombre: 'UNION LIBERAL', habilitadaLocal: true, habilitadaProvincial: true },
+  { numero: '91', nombre: 'ESP. ABIERTO PARA EL DES. Y LA INT. SOCIAL', habilitadaLocal: true, habilitadaProvincial: true },
+  { numero: '959', nombre: 'MOVIMIENTO AVANZADA SOCIALISTA', habilitadaLocal: false, habilitadaProvincial: true },
+  { numero: '963', nombre: 'FRENTE PATRIOTA FEDERAL', habilitadaLocal: false, habilitadaProvincial: true },
+  { numero: '974', nombre: 'POLITICA OBRERA', habilitadaLocal: true, habilitadaProvincial: true },
+  { numero: '980', nombre: 'PARTIDO TIEMPO DE TODOS', habilitadaLocal: false, habilitadaProvincial: true },
+  { numero: '1003', nombre: 'CONSTRUYENDO PORVENIR', habilitadaLocal: false, habilitadaProvincial: true },
+  { numero: '1006', nombre: 'PARTIDO LIBERTARIO', habilitadaLocal: true, habilitadaProvincial: true },
+  { numero: '1008', nombre: 'VALORES REPUBLICANOS', habilitadaLocal: false, habilitadaProvincial: true },
+  { numero: '615', nombre: 'IDEAR PERGAMINO', habilitadaLocal: true, habilitadaProvincial: false }
 ];
 
 const CargarActa: React.FC = () => {
@@ -61,6 +53,10 @@ const CargarActa: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [mensaje, setMensaje] = useState<MensajeEstado | null>(null);
   
+  // Obtener listas según habilitación
+  const listasProvinciales = LISTAS_OFICIALES.filter(l => l.habilitadaProvincial);
+  const listasLocales = LISTAS_OFICIALES.filter(l => l.habilitadaLocal);
+
   const [acta, setActa] = useState<ActaData>({
     mesaNumero: 1,
     electoresVotaron: 0,
@@ -73,32 +69,31 @@ const CargarActa: React.FC = () => {
     observaciones: ''
   });
 
-  // Inicializar votos cuando cambia la mesa - CORREGIDO
+  // Inicializar votos cuando cambia la mesa
   useEffect(() => {
     const votosProvincialesInit: { [key: string]: number } = {};
     const votosLocalesInit: { [key: string]: number } = {};
     
-    LISTAS_PROVINCIALES_REALES.forEach(lista => {
-      votosProvincialesInit[lista] = 0;
+    listasProvinciales.forEach(lista => {
+      votosProvincialesInit[lista.nombre] = 0;
     });
     
-    LISTAS_LOCALES_REALES.forEach(lista => {
-      votosLocalesInit[lista] = 0;
+    listasLocales.forEach(lista => {
+      votosLocalesInit[lista.nombre] = 0;
     });
 
-    setActa(prev => ({
-      ...prev,
-      votosProvinciales: votosProvincialesInit,
-      votosLocales: votosLocalesInit,
+    setActa({
       mesaNumero: mesaSeleccionada,
       electoresVotaron: 0,
       sobresRecibidos: 0,
+      votosProvinciales: votosProvincialesInit,
+      votosLocales: votosLocalesInit,
       votosEnBlanco: 0,
       votosImpugnados: 0,
       votosSobreNro3: 0,
       observaciones: ''
-    }));
-  }, [mesaSeleccionada]); // Solo depende de mesaSeleccionada
+    });
+  }, [mesaSeleccionada]);
 
   // Limpiar mensaje después de 5 segundos
   useEffect(() => {
@@ -110,7 +105,7 @@ const CargarActa: React.FC = () => {
     }
   }, [mensaje]);
 
-  const handleInputChange = useCallback((campo: keyof ActaData, valor: string | number) => {
+  const handleInputChange = useCallback((campo: keyof ActaData, valor: number) => {
     setActa(prev => ({
       ...prev,
       [campo]: valor
@@ -118,15 +113,22 @@ const CargarActa: React.FC = () => {
     setMensaje(null);
   }, []);
 
-  const handleVotoChange = useCallback((tipo: 'provinciales' | 'locales', lista: string, valor: string) => {
-    const numeroValor = parseInt(valor) || 0;
+  const handleStringInputChange = useCallback((campo: keyof ActaData, valor: string) => {
+    setActa(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+    setMensaje(null);
+  }, []);
+
+  const handleVotoChange = useCallback((tipo: 'provinciales' | 'locales', lista: string, valor: number) => {
     const campo = tipo === 'provinciales' ? 'votosProvinciales' : 'votosLocales';
     
     setActa(prev => ({
       ...prev,
       [campo]: {
         ...prev[campo],
-        [lista]: Math.max(0, numeroValor)
+        [lista]: Math.max(0, valor)
       }
     }));
     setMensaje(null);
@@ -135,17 +137,18 @@ const CargarActa: React.FC = () => {
   const calcularTotales = useCallback(() => {
     const totalProvinciales = Object.values(acta.votosProvinciales).reduce((sum, val) => sum + (val || 0), 0);
     const totalLocales = Object.values(acta.votosLocales).reduce((sum, val) => sum + (val || 0), 0);
-    const totalGeneral = totalProvinciales + totalLocales + acta.votosEnBlanco + acta.votosImpugnados + acta.votosSobreNro3;
+    const totalOtrosVotos = acta.votosEnBlanco + acta.votosImpugnados + acta.votosSobreNro3;
+    const diferencia = acta.electoresVotaron - acta.sobresRecibidos;
     
     return {
       totalProvinciales,
       totalLocales,
-      totalGeneral,
-      diferencia: acta.electoresVotaron - acta.sobresRecibidos
+      totalOtrosVotos,
+      diferencia
     };
   }, [acta]);
 
-  const validarActa = (): ValidationResult => {
+  const validarActa = useCallback(() => {
     const totales = calcularTotales();
     const errores: string[] = [];
     const warnings: string[] = [];
@@ -163,18 +166,13 @@ const CargarActa: React.FC = () => {
     }
 
     if (totales.totalProvinciales > acta.sobresRecibidos) {
-      errores.push('Los votos provinciales no pueden superar los sobres recibidos');
+      errores.push(`Los votos provinciales (${totales.totalProvinciales}) no pueden superar los sobres recibidos (${acta.sobresRecibidos})`);
     }
 
     if (totales.totalLocales > acta.sobresRecibidos) {
-      errores.push('Los votos locales no pueden superar los sobres recibidos');
+      errores.push(`Los votos locales (${totales.totalLocales}) no pueden superar los sobres recibidos (${acta.sobresRecibidos})`);
     }
 
-    if (totales.totalGeneral > acta.sobresRecibidos) {
-      errores.push('El total de votos no puede superar los sobres recibidos');
-    }
-
-    // Validaciones de coherencia (warnings)
     const participacionProvincial = acta.sobresRecibidos > 0 ? 
       (totales.totalProvinciales / acta.sobresRecibidos) * 100 : 0;
     
@@ -194,7 +192,7 @@ const CargarActa: React.FC = () => {
     }
 
     return { errores, warnings };
-  };
+  }, [acta, calcularTotales]);
 
   const handleGuardar = async (): Promise<void> => {
     const resultado = validarActa();
@@ -207,7 +205,6 @@ const CargarActa: React.FC = () => {
       return;
     }
 
-    // Mostrar warnings si los hay
     if (resultado.warnings.length > 0) {
       setMensaje({
         tipo: 'warning',
@@ -281,17 +278,10 @@ const CargarActa: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow border">
         {/* Header del acta */}
-        <div className="bg-gray-50 px-6 py-4 border-b">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">CERTIFICADO DE ESCRUTINIO</h2>
-              <p className="text-sm text-gray-600">ELECCIONES PROVINCIALES - PERGAMINO</p>
-            </div>
-            <div className="text-right">
-              <p className="font-medium">DISTRITO ELECTORAL</p>
-              <p className="text-lg font-bold">087 - PERGAMINO</p>
-            </div>
-          </div>
+        <div className="bg-gray-50 px-6 py-4 border-b text-center">
+          <h2 className="text-xl font-bold">CERTIFICADO DE ESCRUTINIO</h2>
+          <p className="text-sm">ELECCIONES PROVINCIALES - PERGAMINO</p>
+          <p className="text-lg font-bold mt-2">087 - PERGAMINO</p>
         </div>
 
         <div className="p-6 space-y-6">
@@ -355,72 +345,95 @@ const CargarActa: React.FC = () => {
             </div>
           </div>
 
-          {/* Sección de partidos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Columna izquierda - Diputados Provinciales */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold text-center mb-4 text-blue-800">
-                DIPUTADOS PROVINCIALES
-              </h3>
-              <div className="space-y-3">
-                {LISTAS_PROVINCIALES_REALES.map((lista, index) => (
-                  <div key={lista} className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-white rounded flex items-center justify-center text-sm font-medium border">
-                      {2200 + index}
-                    </div>
-                    <div className="flex-1 text-sm font-medium">
-                      {lista}
-                    </div>
-                    <input
-                      type="number"
-                      min="0"
-                      value={acta.votosProvinciales[lista] || 0}
-                      onChange={(e) => handleVotoChange('provinciales', lista, e.target.value)}
-                      className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
+          {/* Sección de votos provinciales */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-center mb-4 text-blue-800">
+              DIPUTADOS PROVINCIALES
+            </h3>
+            <div className="space-y-3">
+              {listasProvinciales.map((lista) => (
+                <div key={lista.numero} className="flex items-center space-x-3">
+                  <div className="w-12 h-8 bg-white rounded flex items-center justify-center text-sm font-medium border">
+                    {lista.numero}
                   </div>
-                ))}
-                <div className="mt-4 pt-3 border-t border-blue-200">
-                  <div className="flex justify-between font-semibold text-blue-800">
-                    <span>TOTAL VOTOS PROVINCIALES:</span>
-                    <span>{totales.totalProvinciales}</span>
+                  <div className="flex-1 text-sm font-medium">
+                    {lista.nombre}
                   </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={acta.votosProvinciales[lista.nombre] || 0}
+                    onChange={(e) => handleVotoChange('provinciales', lista.nombre, parseInt(e.target.value) || 0)}
+                    className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              ))}
+              
+              {/* NO USAR para provinciales */}
+              <div className="mt-4 pt-3 border-t border-blue-200">
+                <div className="text-sm text-gray-500 mb-2">
+                  <span className="font-medium">615</span> - IDEAR PERGAMINO 
+                  <span className="ml-2 bg-red-100 px-2 py-1 rounded text-red-600 font-bold text-xs">NO USAR</span>
                 </div>
               </div>
-            </div>
-
-            {/* Columna derecha - Concejales y Consejeros */}
-            <div className="bg-green-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold text-center mb-4 text-green-800">
-                CONCEJALES Y CONSEJEROS ESCOLARES
-              </h3>
-              <div className="space-y-3">
-                {LISTAS_LOCALES_REALES.map((lista) => (
-                  <div key={lista} className="flex items-center space-x-3">
-                    <div className="flex-1 text-sm font-medium">
-                      {lista}
-                    </div>
-                    <input
-                      type="number"
-                      min="0"
-                      value={acta.votosLocales[lista] || 0}
-                      onChange={(e) => handleVotoChange('locales', lista, e.target.value)}
-                      className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    />
-                  </div>
-                ))}
-                <div className="mt-4 pt-3 border-t border-green-200">
-                  <div className="flex justify-between font-semibold text-green-800">
-                    <span>TOTAL VOTOS LOCALES:</span>
-                    <span>{totales.totalLocales}</span>
-                  </div>
+              
+              <div className="mt-4 pt-3 border-t border-blue-200">
+                <div className="flex justify-between font-semibold text-blue-800">
+                  <span>TOTAL VOTOS PROVINCIALES:</span>
+                  <span>{totales.totalProvinciales}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Votos especiales */}
+          {/* Sección de votos locales */}
+          <div className="bg-green-50 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-center mb-4 text-green-800">
+              CONCEJALES Y CONSEJEROS ESCOLARES
+            </h3>
+            <div className="space-y-3">
+              {listasLocales.map((lista) => (
+                <div key={lista.numero} className="flex items-center space-x-3">
+                  <div className="w-12 h-8 bg-white rounded flex items-center justify-center text-sm font-medium border">
+                    {lista.numero}
+                  </div>
+                  <div className="flex-1 text-sm font-medium">
+                    {lista.nombre}
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={acta.votosLocales[lista.nombre] || 0}
+                    onChange={(e) => handleVotoChange('locales', lista.nombre, parseInt(e.target.value) || 0)}
+                    className="w-20 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+              ))}
+              
+              {/* NO USAR para locales */}
+              <div className="mt-4 pt-3 border-t border-green-200">
+                <div className="text-sm text-gray-500 space-y-1">
+                  {LISTAS_OFICIALES.filter(l => !l.habilitadaLocal && l.habilitadaProvincial).map((lista) => (
+                    <div key={lista.numero}>
+                      <span className="font-medium">{lista.numero}</span> - {lista.nombre}
+                      <span className="ml-2 bg-red-100 px-2 py-1 rounded text-red-600 font-bold text-xs">NO USAR</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-3 border-t border-green-200">
+                <div className="flex justify-between font-semibold text-green-800">
+                  <span>TOTAL VOTOS LOCALES:</span>
+                  <span>{totales.totalLocales}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Otros votos */}
           <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-center mb-4">OTROS VOTOS</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label htmlFor="votos-blanco" className="block text-sm font-medium text-gray-700 mb-2">
@@ -472,7 +485,7 @@ const CargarActa: React.FC = () => {
             <textarea
               id="observaciones"
               value={acta.observaciones}
-              onChange={(e) => handleInputChange('observaciones', e.target.value)}
+              onChange={(e) => handleStringInputChange('observaciones', e.target.value)}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Observaciones generales sobre el escrutinio..."
@@ -493,11 +506,11 @@ const CargarActa: React.FC = () => {
               </div>
               <div>
                 <span className="text-gray-600">Otros Votos:</span>
-                <div className="font-semibold">{acta.votosEnBlanco + acta.votosImpugnados + acta.votosSobreNro3}</div>
+                <div className="font-semibold">{totales.totalOtrosVotos}</div>
               </div>
               <div>
                 <span className="text-gray-600">Total General:</span>
-                <div className="font-bold text-lg">{totales.totalGeneral}</div>
+                <div className="font-bold text-lg">{totales.totalProvinciales + totales.totalLocales + totales.totalOtrosVotos}</div>
               </div>
             </div>
           </div>

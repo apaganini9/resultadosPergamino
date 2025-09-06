@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MesaService, Mesa } from '../services/api';
 import { 
@@ -27,23 +27,19 @@ const EstadoMesas: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<'TODOS' | 'PENDIENTE' | 'CARGADA'>('TODOS');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [animateCards, setAnimateCards] = useState(false);
 
-  const cargarMesas = async (page: number = 1) => {
+  const cargarMesas = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const filtroAPI = filtroEstado === 'TODOS' ? undefined : filtroEstado;
       const response = await MesaService.getAllMesas();
       
       if (response.success && response.data) {
         const mesasData = response.data;
         setMesas(mesasData);
-        setTotalPages(Math.ceil(mesasData.length / 50));
         setAnimateCards(true);
         setTimeout(() => setAnimateCards(false), 600);
       } else {
@@ -70,11 +66,11 @@ const EstadoMesas: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    cargarMesas(currentPage);
-  }, [currentPage, filtroEstado]);
+    cargarMesas();
+  }, [cargarMesas]);
 
   const mesasFiltradas = mesas.filter(mesa => {
     const matchSearch = searchTerm === '' || 
@@ -194,7 +190,7 @@ const EstadoMesas: React.FC = () => {
             </div>
             
             <button
-              onClick={() => cargarMesas(currentPage)}
+              onClick={cargarMesas}
               disabled={loading}
               className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-all duration-300 disabled:opacity-50 border border-white/20 group"
             >
@@ -337,7 +333,7 @@ const EstadoMesas: React.FC = () => {
             <AlertCircle className="h-16 w-16 text-red-300 mx-auto mb-4" />
             <p className="text-red-100 text-xl font-semibold mb-4">{error}</p>
             <button
-              onClick={() => cargarMesas(currentPage)}
+              onClick={cargarMesas}
               className="bg-red-500/30 text-red-100 px-6 py-3 rounded-xl hover:bg-red-500/40 transition-all duration-300 font-medium"
             >
               Reintentar Carga

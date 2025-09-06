@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   Plus, 
   Edit, 
-  Trash2, 
   UserCheck, 
   UserX, 
   Shield,
@@ -24,7 +23,7 @@ interface Usuario {
 const GestionUsuarios: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-  const [loading, setLoading] = useState(true);
+  
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<Usuario | null>(null);
   const [formData, setFormData] = useState({
@@ -36,7 +35,7 @@ const GestionUsuarios: React.FC = () => {
 
   const cargarUsuarios = async () => {
     try {
-      setLoading(true);
+      // setLoading(true);
       // Simular datos por ahora
       const usuariosSimulados: Usuario[] = [
         {
@@ -72,7 +71,7 @@ const GestionUsuarios: React.FC = () => {
     } catch (error) {
       console.error('Error al cargar usuarios:', error);
     } finally {
-      setLoading(false);
+      // setLoading(false);
     }
   };
 

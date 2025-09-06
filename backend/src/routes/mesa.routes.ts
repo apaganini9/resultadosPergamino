@@ -8,6 +8,7 @@ const router = Router();
 router.get('/', MesaController.obtenerMesas);
 router.get('/estadisticas', MesaController.obtenerEstadisticas);
 router.get('/pendientes', MesaController.obtenerMesasPendientes);
+router.get('/listas', MesaController.obtenerListas); // Nueva ruta para obtener listas
 router.get('/:numero', MesaController.obtenerMesaPorNumero);
 router.get('/:numero/validar', MesaController.validarMesa);
 
