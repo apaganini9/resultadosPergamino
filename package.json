@@ -4,8 +4,11 @@
   "description": "Sistema de Centro de Cómputos Electoral",
   "scripts": {
     "build": "cd backend && npm install && npm run db:generate && npm run build && cd ../frontend && npm install && npm run build",
+    "postbuild": "cd backend && npx prisma migrate deploy",
     "start": "cd backend && npm run start",
-    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm start\""
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm start\"",
+    "db:migrate": "cd backend && npx prisma migrate deploy",
+    "db:seed": "cd backend && npx prisma db seed"
   },
   "engines": {
     "node": "18.x"

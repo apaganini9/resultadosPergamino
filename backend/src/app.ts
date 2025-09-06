@@ -9,8 +9,11 @@ import { PrismaClient, TipoLista } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authMiddleware, requireRole } from './middleware/auth.middleware';
-import path from 'path'; // ⭐ AGREGAR ESTA LÍNEA
+import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
+const execAsync = promisify(exec);
 
 interface VotoData {
   mesaId: number;
@@ -19,6 +22,27 @@ interface VotoData {
 }
 
 dotenv.config();
+
+// Función para ejecutar migraciones automáticamente
+async function runMigrations() {
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      console.log('🔄 Running Prisma migrations...');
+      
+      // Ejecutar migraciones
+      const { stdout: migrateOut } = await execAsync('npx prisma migrate deploy');
+      console.log('✅ Migrations completed:', migrateOut);
+      
+      // Verificar conexión a la base de datos
+      await prisma.$connect();
+      console.log('✅ Database connection verified');
+      
+    } catch (error) {
+      console.error('❌ Migration error:', error);
+      // No detener la aplicación, solo loggear el error
+    }
+  }
+}
 
 const app = express();
 const server = createServer(app);
@@ -34,22 +58,35 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ⭐ AGREGAR: Servir archivos estáticos del frontend en producción
+// Servir archivos estáticos del frontend en producción
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../../frontend/build')));
 }
 
-// ... (todas tus rutas API existentes) ...
+// Ejecutar migraciones al iniciar
+runMigrations();
 
-// ⭐ AGREGAR AL FINAL, ANTES DEL server.listen:
+// === RUTAS API ===
+// TODO: Aquí van todas tus rutas API existentes
+// app.use('/api/auth', authRoutes);
+// app.use('/api/mesas', mesaRoutes);
+// etc.
+
+// Ruta de prueba
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'API funcionando correctamente',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV 
+  });
+});
+
 // Fallback para React Router en producción
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../../frontend/build/index.html'));
   });
 }
-
-// ⭐ AGREGAR AL FINAL DEL ARCHIVO app.js
 
 // Configuración del puerto
 const PORT = parseInt(process.env.PORT || '3000', 10);
