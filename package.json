@@ -1,0 +1,16 @@
+{
+  "name": "resultadosPergamino",
+  "version": "1.0.0",
+  "description": "Sistema de Centro de Cómputos Electoral",
+  "scripts": {
+    "build": "cd backend && npm install && npm run db:generate && npm run build && cd ../frontend && npm install && npm run build",
+    "start": "cd backend && npm run start",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm start\""
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "dependencies": {
+    "concurrently": "^7.6.0"
+  }
+}
