@@ -93,7 +93,7 @@ const CargarActa: React.FC = () => {
       votosSobreNro3: 0,
       observaciones: ''
     });
-  }, [mesaSeleccionada]);
+  }, [mesaSeleccionada, listasProvinciales, listasLocales]); // ✅ Dependencias agregadas
 
   // Limpiar mensaje después de 5 segundos
   useEffect(() => {

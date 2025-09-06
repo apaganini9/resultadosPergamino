@@ -9,8 +9,9 @@ import {
   Edit3, 
   CheckCircle, 
   AlertTriangle,
-  BarChart3,
-  Users
+  // Comentar temporalmente estos iconos no utilizados
+  // BarChart3,
+  // Users
 } from 'lucide-react';
 
 // Interfaces para el tipado
