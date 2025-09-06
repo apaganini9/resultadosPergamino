@@ -52,7 +52,7 @@ if (process.env.NODE_ENV === 'production') {
 // ⭐ AGREGAR AL FINAL DEL ARCHIVO app.js
 
 // Configuración del puerto
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 // Iniciar el servidor
 server.listen(PORT, '0.0.0.0', () => {
